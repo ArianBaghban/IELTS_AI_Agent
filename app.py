@@ -1,149 +1,102 @@
-import streamlit as st
+import re
+def extract_json(text):
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        return match.group()
+    return text
 
-# ---------------------------
-# Page Config
-# ---------------------------
+
+
+import streamlit as st
+import json
+from engine import analyze_essay
 
 st.set_page_config(
-    page_title="IELTS AI Agent",
-    page_icon="🎯"
+    page_title="IELTS AI Assistant",
+    layout="wide"
 )
 
-# ---------------------------
-# Functions
-# ---------------------------
-
-def count_words(text):
-    return len(text.split())
-
-
-def calculate_band_score(word_count, paragraph_count):
-    score = 5.0
-
-    if word_count >= 250:
-        score += 1
-
-    if paragraph_count >= 4:
-        score += 1
-
-    return score
-
-
-# ---------------------------
-# UI
-# ---------------------------
-
-st.title("🎯 IELTS AI Agent")
-
-st.write(
-    "Paste your IELTS Writing Task 2 essay below and click Analyze."
-)
+st.title("🎯 IELTS Writing Task 2 AI Analyzer")
 
 essay = st.text_area(
-    "Your Essay",
-    height=300,
-    placeholder="Write or paste your IELTS essay here..."
+    "Paste your Writing Task 2 Essay (Max 320 words)",
+    height=250
 )
-
-# ---------------------------
-# Analysis
-# ---------------------------
 
 if st.button("Analyze Essay"):
 
-    if essay.strip() == "":
-        st.warning("Please enter your essay first.")
+    if not essay.strip():
+        st.warning("Please enter an essay first.")
 
     else:
 
-        # Word Count
-        word_count = count_words(essay)
+        with st.spinner("Analyzing essay..."):
+            result = analyze_essay(essay)
 
-        # Paragraph Count
-        paragraphs = [p for p in essay.split("\n\n") if p.strip()]
-        paragraph_count = len(paragraphs)
+        try:
 
-        # Score
-        score = calculate_band_score(
-            word_count,
-            paragraph_count
-        )
+            clean_result = extract_json(result)
+            data = json.loads(clean_result)
 
-        # IELTS Criteria (Temporary)
-        task_response = score
-        coherence = score
-        lexical = score
-        grammar = score
+            st.subheader("📊 IELTS Scores")
 
-        # Statistics
-        st.subheader("📈 Essay Statistics")
+            col1, col2, col3, col4, col5 = st.columns(5)
 
-        st.write(f"Word Count: {word_count}")
-        st.write(f"Paragraph Count: {paragraph_count}")
+            with col1:
+                st.metric(
+                    "Task Response",
+                    data["task_response"]["score"]
+                )
 
-        if word_count < 250:
-            st.error(
-                "Essay is below the IELTS recommended minimum of 250 words."
-            )
-        else:
-            st.success(
-                "Essay meets the minimum word requirement."
-            )
+            with col2:
+                st.metric(
+                    "Coherence",
+                    data["coherence_cohesion"]["score"]
+                )
 
-        if paragraph_count < 4:
-            st.warning(
-                "Essay may need a clearer IELTS structure (usually 4+ paragraphs)."
-            )
-        else:
-            st.success(
-                "Essay structure looks reasonable."
-            )
+            with col3:
+                st.metric(
+                    "Lexical",
+                    data["lexical_resource"]["score"]
+                )
 
-        # IELTS Scores
-        st.subheader("📊 IELTS Band Breakdown")
+            with col4:
+                st.metric(
+                    "Grammar",
+                    data["grammar_accuracy"]["score"]
+                )
 
-        st.write(f"Overall Band: {score}")
-        st.write(f"Task Response: {task_response}")
-        st.write(f"Coherence & Cohesion: {coherence}")
-        st.write(f"Lexical Resource: {lexical}")
-        st.write(f"Grammatical Range & Accuracy: {grammar}")
+            with col5:
+                st.metric(
+                    "Overall",
+                    data["overall_band"]
+                )
 
-        # Feedback
-        strengths = []
-        weaknesses = []
+            st.divider()
 
-        if word_count >= 250:
-            strengths.append("Good essay length")
-        else:
-            weaknesses.append("Essay is too short")
+            st.subheader("❌ Errors")
+            st.json(data["errors"])
 
-        if paragraph_count >= 4:
-            strengths.append("Reasonable paragraph structure")
-        else:
-            weaknesses.append("Essay structure needs improvement")
+            st.divider()
 
-        # Strengths
-        st.subheader("✅ Strengths")
+            st.subheader("💡 Recommendations")
+            st.write(data["recommendations"])
 
-        for item in strengths:
-            st.write("- " + item)
+            st.divider()
 
-        # Weaknesses
-        st.subheader("⚠️ Weaknesses")
+            st.subheader("✍️ Improved Essay")
+            st.write(data["improved_essay"])
 
-        for item in weaknesses:
-            st.write("- " + item)
+            st.divider()
 
-        # Improvement Plan
-        st.subheader("🚀 Improvement Plan")
+            st.subheader("📘 Band 8 Sample Essay")
+            st.write(data["sample_band_8_essay"])
 
-        if word_count < 250:
-            st.write("- Write essays with at least 250 words.")
+        except Exception as e:
 
-        if paragraph_count < 4:
-            st.write(
-                "- Use Introduction, Body Paragraph 1, Body Paragraph 2 and Conclusion."
-            )
+            st.error("Failed to parse AI response")
 
-        st.write("- Practice complex sentence structures.")
-        st.write("- Expand your academic vocabulary.")
+            st.subheader("Raw Response")
+            st.write(result)
+
+            st.write(e)
